@@ -1,0 +1,407 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>MaxwellSim — Heli RF Planner (Pro v1.3 • Industrial Visuals)</title>
+<style>
+  :root{ --bg:#01161E; --panel:#0e2a35; --line:#244653; --ok:#AEC3B0; --txt:#EFF6E0; --muted:#082029; --accent:#598392; }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
+  header{padding:14px 18px;border-bottom:1px solid var(--line)}
+  h1{margin:0 0 6px;font-size:20px;color:var(--ok);letter-spacing:.2px}
+  small{opacity:.9}
+  .wrap{display:flex;gap:16px;flex-wrap:wrap;padding:16px}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px;flex:1;min-width:360px;box-shadow:0 10px 28px rgba(0,0,0,.25)}
+  .panel.wide{flex:2.2;min-width:680px}
+  .grid{display:grid;grid-template-columns:repeat(2,minmax(170px,1fr));gap:8px 12px}
+  label{display:flex;justify-content:space-between;gap:8px;font-size:12px;margin:6px 0}
+  input[type=range],select{width:100%}
+  input[type=range]{accent-color:var(--ok)}
+  select{background:rgba(255,255,255,0.06);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:4px}
+  .row{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0;align-items:center}
+  button{background:rgba(239,246,224,0.08);border:1px solid var(--line);color:var(--txt);padding:8px 10px;border-radius:10px;cursor:pointer}
+  button:hover{background:rgba(239,246,224,0.16)}
+  .primary{background:var(--ok);color:#001015;border-color:#7ea38b}
+  canvas{background:#071b22;border:1px solid var(--line);border-radius:12px;image-rendering:auto}
+  .kv{display:grid;grid-template-columns:auto 1fr;gap:6px 12px;font-size:13px;margin-top:6px}
+  .log{white-space:pre-wrap;background:rgba(1,22,30,0.6);padding:8px;border-radius:8px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;border:1px dashed var(--line)}
+  .hint{opacity:.85;font-size:12px}
+  .rightRow{display:flex;gap:8px;justify-content:flex-end;align-items:center}
+</style>
+</head>
+<body>
+<header>
+  <h1>🛰️ MaxwellSim — Heli RF Planner (Pro v1.3)</h1>
+  <small>Industrial Visualization • Viridis colormap • Labeled contours • dBm colorbar • 4K export</small>
+</header>
+
+<div class="wrap">
+  <div class="panel">
+    <h3>Parametreler</h3>
+    <div class="grid">
+      <div><label>Frekans (MHz) <span id="fv"></span></label><input id="freq" type="range" min="100" max="6000" step="10" value="900"></div>
+      <div><label>Tx Gücü (W) <span id="pwv"></span></label><input id="ptw" type="range" min="0.1" max="100" step="0.1" value="10"></div>
+      <div><label>Gt (dBi) <span id="gtv"></span></label><input id="gt" type="range" min="-5" max="20" step="0.5" value="2"></div>
+      <div><label>Gr (dBi) <span id="grv"></span></label><input id="gr" type="range" min="-5" max="20" step="0.5" value="2"></div>
+      <div><label>Alan Ölçeği (m) <span id="scv"></span></label><input id="scale" type="range" min="60" max="400" step="10" value="160"></div>
+      <div><label>Örnekleme (n) <span id="resv"></span></label><input id="res" type="range" min="120" max="600" step="20" value="320"></div>
+      <div><label>Ant. X (m) <span id="axv"></span></label><input id="antx" type="range" min="-20" max="20" step="0.5" value="0"></div>
+      <div><label>Ant. Z (m) <span id="azv"></span></label><input id="antz" type="range" min="-6" max="6" step="0.1" value="0"></div>
+      <div><label>Gövde L×W (m) <span id="flw"></span></label><input id="fuselLen" type="range" min="8" max="22" step="0.5" value="12"><input id="fuselWid" type="range" min="1.5" max="5" step="0.1" value="2.2"></div>
+      <div><label>Gövde Atten (dB) <span id="fattenv"></span></label><input id="fuselAtt" type="range" min="0" max="30" step="1" value="10"></div>
+      <div><label>Rotor R (m) <span id="rrv"></span></label><input id="rotorR" type="range" min="4" max="12" step="0.2" value="7.5"></div>
+      <div><label>Bıçak N / Chord <span id="bncv"></span></label><input id="bladeN" type="range" min="2" max="6" step="1" value="4"><input id="bladeChord" type="range" min="0.15" max="0.6" step="0.01" value="0.25"></div>
+      <div><label>Rotor Atten@LOS (dB) <span id="rattv"></span></label><input id="rotorAtt" type="range" min="0" max="25" step="1" value="6"></div>
+      <div><label>Eşik (Pr dBm) <span id="thv"></span></label><input id="thresh" type="range" min="-120" max="-40" step="2" value="-90"></div>
+      <div><label>FSPL</label><select id="fsplMode"><option value="3d">3D (20log d + 20log f + 32.44)</option><option value="2d">2D (20log d + K)</option></select></div>
+    </div>
+    <div class="row">
+      <label><input id="auto" type="checkbox" checked> Otomatik çiz</label>
+      <label><input id="smooth" type="checkbox" checked> Yumuşatma</label>
+      <label><input id="contours" type="checkbox" checked> İzokontur</label>
+      <label><input id="axes" type="checkbox" checked> Eksen</label>
+      <label><input id="maskBelow" type="checkbox"> Eşik altını karart</label>
+      <label><input id="heliOverlay" type="checkbox" checked> Heli overlay</label>
+    </div>
+    <div class="row">
+      <button id="preset-uhf">UHF (430 MHz)</button>
+      <button id="preset-sband">S-Band (2.4 GHz)</button>
+      <button id="simulate" class="primary">Simüle</button>
+      <button id="exportPng">PNG Export (4K)</button>
+    </div>
+    <div class="kv" id="stats"></div>
+    <div class="log" id="log" style="margin-top:8px"></div>
+  </div>
+
+  <div class="panel wide">
+    <div class="rightRow">
+      <span class="hint">Viridis dBm colorbar</span>
+      <canvas id="cbar" width="24" height="220"></canvas>
+    </div>
+    <h3>Plan Görünüm (x–z)</h3>
+    <canvas id="cv" width="1100" height="720"></canvas>
+    <div class="hint" id="cursor">Hover: (x,z) & Pr dBm</div>
+  </div>
+</div>
+
+<script>
+const el=id=>document.getElementById(id);
+const toDbm = w => 10*Math.log10(w*1000);
+function fspl_dB(d_m, f_MHz, mode='3d'){
+  const d_km = Math.max(1e-6, d_m/1000);
+  return mode==='3d'
+    ? 20*Math.log10(d_km) + 20*Math.log10(f_MHz) + 32.44
+    : 20*Math.log10(Math.max(1e-3,d_m)) + 60;
+}
+// viridis colormap (approx)
+function viridis(t){ // t in [0,1]
+  const a = [68,1,84], b=[59,82,139], c=[33,145,140], d=[94,201,97], e=[253,231,37];
+  function lerp(u,v,w){ return u+(v-u)*w; }
+  if(t<.25) { const k=t/.25; return [Math.round(lerp(a[0],b[0],k)),Math.round(lerp(a[1],b[1],k)),Math.round(lerp(a[2],b[2],k))]; }
+  if(t<.5)  { const k=(t-.25)/.25; return [Math.round(lerp(b[0],c[0],k)),Math.round(lerp(b[1],c[1],k)),Math.round(lerp(b[2],c[2],k))]; }
+  if(t<.75) { const k=(t-.5)/.25; return [Math.round(lerp(c[0],d[0],k)),Math.round(lerp(c[1],d[1],k)),Math.round(lerp(c[2],d[2],k))]; }
+  const k=(t-.75)/.25; return [Math.round(lerp(d[0],e[0],k)),Math.round(lerp(d[1],e[1],k)),Math.round(lerp(d[2],e[2],k))];
+}
+function colorbar(minDbm,maxDbm){
+  const cv=el('cbar'), cx=cv.getContext('2d'), W=cv.width, H=cv.height;
+  const img = cx.createImageData(W,H);
+  for(let y=0;y<H;y++){
+    const t=1-y/(H-1);
+    const [r,g,b]=viridis(t);
+    for(let x=0;x<W;x++){ const i=(y*W+x)*4; img.data[i]=r; img.data[i+1]=g; img.data[i+2]=b; img.data[i+3]=255; }
+  }
+  cx.putImageData(img,0,0);
+  // ticks
+  cx.fillStyle='#EFF6E0'; cx.strokeStyle='rgba(255,255,255,.4)'; cx.font='12px ui-monospace,monospace';
+  cx.textAlign='left'; cx.textBaseline='middle';
+  cx.clearRect(W-1,0,1,H);
+  const ticks=6;
+  for(let i=0;i<ticks;i++){
+    const y=Math.round(i*(H-1)/(ticks-1));
+    const val = maxDbm - i*(maxDbm-minDbm)/(ticks-1);
+    cx.fillStyle='rgba(0,0,0,.35)'; cx.fillRect(0,y-7, W,14);
+    cx.fillStyle='#EFF6E0';
+    cx.fillText(val.toFixed(0)+' dBm', 2, y);
+  }
+}
+function rotorAvgAtten_dB(N,chord,R,attenLOS){
+  const ratio=Math.min(.95, (N*chord)/(2*Math.PI*R)); return ratio*attenLOS;
+}
+function crossesFuselage(ax,az, px,pz, a,b){
+  const dx=px-ax, dz=pz-az, Ax=ax, Az=az;
+  const A=(dx*dx)/(a*a)+(dz*dz)/(b*b);
+  const B=2*((Ax*dx)/(a*a)+(Az*dz)/(b*b));
+  const C=(Ax*Ax)/(a*a)+(Az*Az)/(b*b)-1;
+  const D=B*B-4*A*C; if(D<0) return false;
+  const t1=(-B-Math.sqrt(D))/(2*A), t2=(-B+Math.sqrt(D))/(2*A);
+  return (t1>1e-3&&t1<.999)||(t2>1e-3&&t2<.999);
+}
+function crossesRotor(ax,az, px,pz, r){
+  const dx=px-ax, dz=pz-az;
+  const A=dx*dx+dz*dz, B=2*(ax*dx+az*dz), C=ax*ax+az*az-r*r;
+  const D=B*B-4*A*C; if(D<0) return false;
+  const t1=(-B-Math.sqrt(D))/(2*A), t2=(-B+Math.sqrt(D))/(2*A);
+  return (t1>1e-3&&t1<.999)||(t2>1e-3&&t2<.999);
+}
+
+const ids=['freq','ptw','gt','gr','scale','res','antx','antz','fuselLen','fuselWid','fuselAtt','rotorR','bladeN','bladeChord','rotorAtt','thresh','fsplMode','auto','smooth','contours','axes','maskBelow','heliOverlay'];
+function upd(){
+  el('fv').textContent=el('freq').value+' MHz';
+  el('pwv').textContent=el('ptw').value+' W';
+  el('gtv').textContent=el('gt').value+' dBi';
+  el('grv').textContent=el('gr').value+' dBi';
+  el('scv').textContent=el('scale').value+' m';
+  el('resv').textContent=el('res').value;
+  el('axv').textContent=el('antx').value+' m';
+  el('azv').textContent=el('antz').value+' m';
+  el('flw').textContent=el('fuselLen').value+'×'+el('fuselWid').value+' m';
+  el('fattenv').textContent=el('fuselAtt').value+' dB';
+  el('rrv').textContent=el('rotorR').value+' m';
+  el('bncv').textContent=el('bladeN').value+'/'+el('bladeChord').value+' m';
+  el('rattv').textContent=el('rotorAtt').value+' dB';
+  el('thv').textContent=el('thresh').value+' dBm';
+  if (el('auto').checked) draw();
+}
+function bind(){ ids.forEach(id=>{ el(id).addEventListener('input',upd); el(id).addEventListener('change',upd); }); }
+function P(){
+  return {
+    f:+el('freq').value, Pt:+el('ptw').value, Gt:+el('gt').value, Gr:+el('gr').value,
+    S:+el('scale').value, n:+el('res').value|0, ax:+el('antx').value, az:+el('antz').value,
+    L:+el('fuselLen').value, W:+el('fuselWid').value, FdB:+el('fuselAtt').value,
+    R:+el('rotorR').value, N:+el('bladeN').value|0, chord:+el('bladeChord').value,
+    RdB:+el('rotorAtt').value, th:+el('thresh').value, mode:el('fsplMode').value,
+    auto:el('auto').checked, smooth:el('smooth').checked, contours:el('contours').checked,
+    axes:el('axes').checked, maskBelow:el('maskBelow').checked, heli:el('heliOverlay').checked
+  };
+}
+
+// Marching squares for labeled contours
+function contours(grid, levels, sx,sz, W,H, pad, cx){
+  cx.save();
+  cx.strokeStyle='rgba(255,255,255,.65)'; cx.lineWidth=1; cx.setLineDash([6,3]);
+  const nx=grid.length, nz=grid[0].length;
+  for(const L of levels){
+    for(let i=0;i<nx-1;i++){
+      for(let j=0;j<nz-1;j++){
+        const v00=grid[i][j], v10=grid[i+1][j], v01=grid[i][j+1], v11=grid[i+1][j+1];
+        const c = (v00>=L?1:0) | (v10>=L?2:0) | (v11>=L?4:0) | (v01>=L?8:0);
+        if(c===0||c===15) continue;
+        const pts=[];
+        function interp(a,b,va,vb){
+          const t=(L-va)/(vb-va+1e-9); return a+(b-a)*t;
+        }
+        const xA=i, xB=i+1, zA=j, zB=j+1;
+        const e=[
+          {x:interp(xA,xA, v00, v01), z:interp(zA,zB, v00, v01)},
+          {x:interp(xB,xB, v10, v11), z:interp(zA,zB, v10, v11)},
+          {x:interp(xA,xB, v00, v10), z:interp(zA,zA, v00, v10)},
+          {x:interp(xA,xB, v01, v11), z:interp(zB,zB, v01, v11)},
+        ];
+        const map={1:[0,2],2:[2,1],3:[0,1],4:[1,3],5:[0,3,2,1],6:[2,3],7:[0,3],8:[0,3],9:[2,3],10:[0,2,1,3],11:[1,3],12:[0,1],13:[2,1],14:[0,2]};
+        const arr=map[c]||[];
+        for(let k=0;k<arr.length;k+=2){
+          const a=e[arr[k]], b=e[arr[k+1]];
+          cx.beginPath(); cx.moveTo(sx(a.x), sz(a.z)); cx.lineTo(sx(b.x), sz(b.z)); cx.stroke();
+        }
+      }
+    }
+    // labels
+    cx.fillStyle='rgba(255,255,255,.9)'; cx.font='12px ui-monospace,monospace';
+    cx.fillText(L.toFixed(0)+' dBm', 8, 18+14*levels.indexOf(L));
+  }
+  cx.restore();
+}
+
+function draw(){
+  const p=P();
+  const cv=el('cv'), cx=cv.getContext('2d');
+  const W=cv.width, H=cv.height, pad=28;
+  cx.clearRect(0,0,W,H);
+  cx.imageSmoothingEnabled=true; cx.imageSmoothingQuality='high';
+
+  // coordinate transforms
+  const sx = x => pad + (x + p.S/2) / p.S * (W - 2*pad);
+  const sz = z => H/2 - (z / (p.S/2)) * (H/2 - pad);
+  const ix = X => (X - pad) / (W - 2*pad) * p.S - p.S/2;
+  const iz = Z => (H/2 - Z) / (H/2 - pad) * (p.S/2);
+
+  // grid compute (n x n/2)
+  const nx = p.n, nz = Math.round(p.n/2);
+  const grid = Array.from({length:nx}, ()=>Array(nz).fill(0));
+  const Pt_dBm = toDbm(p.Pt), EIRP = Pt_dBm + p.Gt;
+  let gmin=+1e9, gmax=-1e9;
+  for(let i=0;i<nx;i++){
+    const X = -p.S/2 + i*(p.S/(nx-1));
+    for(let j=0;j<nz;j++){
+      const Z = -p.S/2 + j*(p.S/(nz-1));
+      const d = Math.max(1, Math.hypot(p.ax-X, p.az-Z));
+      let L = fspl_dB(d, p.f, p.mode);
+      let atten=0;
+      if (crossesFuselage(p.ax,p.az,X,Z,p.L/2,p.W/2)) atten += p.FdB;
+      if (crossesRotor(p.ax,p.az,X,Z,p.R))           atten += rotorAvgAtten_dB(p.N,p.chord,p.R,p.RdB);
+      const Pr = EIRP - L - atten + p.Gr;
+      grid[i][j]=Pr;
+      if(Pr<gmin) gmin=Pr; if(Pr>gmax) gmax=Pr;
+    }
+  }
+
+  // smoothing
+  if (p.smooth){
+    const K=[[1,2,1],[2,4,2],[1,2,1]]; const div=16;
+    const out=Array.from({length:nx},()=>Array(nz).fill(0));
+    for(let i=0;i<nx;i++){
+      for(let j=0;j<nz;j++){
+        let s=0;
+        for(let a=-1;a<=1;a++) for(let b=-1;b<=1;b++){
+          const ii=Math.max(0,Math.min(nx-1,i+a)), jj=Math.max(0,Math.min(nz-1,j+b));
+          s += grid[ii][jj]*K[a+1][b+1];
+        }
+        out[i][j]=s/div;
+      }
+    }
+    for(let i=0;i<nx;i++) for(let j=0;j<nz;j++) grid[i][j]=out[i][j];
+  }
+
+  // render image via bilinear upsample
+  const img=cx.createImageData(W,H);
+  const minDbm = Math.floor(gmin/5)*5, maxDbm=Math.ceil(gmax/5)*5;
+  for(let Y=pad; Y<H-pad; Y++){
+    const z = iz(Y);
+    const tz = (z + p.S/2) / p.S * (nz-1);
+    const j0 = Math.max(0, Math.min(nz-2, Math.floor(tz)));
+    const j1 = j0+1, fz = tz - j0;
+    for(let X=pad; X<W-pad; X++){
+      const x = ix(X);
+      const tx = (x + p.S/2) / p.S * (nx-1);
+      const i0 = Math.max(0, Math.min(nx-2, Math.floor(tx)));
+      const i1 = i0+1, fx = tx - i0;
+      const v00=grid[i0][j0], v10=grid[i1][j0], v01=grid[i0][j1], v11=grid[i1][j1];
+      const v0 = v00*(1-fx)+v10*fx, v1 = v01*(1-fx)+v11*fx;
+      const v = v0*(1-fz)+v1*fz;
+      const t = Math.max(0, Math.min(1, (v - minDbm) / Math.max(1e-6,(maxDbm-minDbm)) ));
+      const [r,g,b]= viridis(t);
+      const meet = v >= p.th;
+      const R = (!meet && el('maskBelow').checked)? 12 : r;
+      const G = (!meet && el('maskBelow').checked)? 20 : g;
+      const B = (!meet && el('maskBelow').checked)? 26 : b;
+      const idx=(Y*W+X)*4; img.data[idx]=R; img.data[idx+1]=G; img.data[idx+2]=B; img.data[idx+3]=255;
+    }
+  }
+  cx.putImageData(img,0,0);
+
+  // axes & ticks
+  if (p.axes){
+    cx.strokeStyle='rgba(255,255,255,.25)'; cx.lineWidth=1; cx.setLineDash([6,6]);
+    cx.beginPath(); cx.moveTo(28, sz(0)); cx.lineTo(W-28, sz(0)); cx.stroke();
+    cx.setLineDash([3,9]);
+    for(let gx=-p.S/2; gx<=p.S/2; gx+=10){
+      cx.beginPath(); cx.moveTo(sx(gx), 28); cx.lineTo(sx(gx), H-28); cx.stroke();
+    }
+    cx.setLineDash([]);
+    cx.fillStyle='rgba(255,255,255,.75)'; cx.font='12px ui-monospace,monospace'; cx.textAlign='center';
+    for(let gx=-p.S/2; gx<=p.S/2; gx+=20){ cx.fillText(gx.toFixed(0), sx(gx), H-8); }
+    cx.save(); cx.translate(8, H/2); cx.rotate(-Math.PI/2); cx.fillText('z (m)',0,0); cx.restore();
+    cx.fillText('x (m)', W/2, H-22);
+    const barW = (50/p.S)*(W-56); cx.fillStyle='rgba(255,255,255,.8)'; cx.fillRect(W- 28 - barW, H-28, barW, 4);
+    cx.fillStyle='rgba(255,255,255,.75)'; cx.fillText('50 m', W - 28 - barW/2, H-36);
+  }
+
+  // helicopter overlay
+  if (p.heli){
+    cx.save();
+    cx.strokeStyle='rgba(255,255,255,.85)'; cx.lineWidth=1.5;
+    cx.beginPath(); cx.ellipse(sx(0), sz(0), (p.L/2/(p.S/2))*(W-56)/2, (p.W/2/(p.S/2))*(H-56)/2, 0, 0, Math.PI*2); cx.stroke();
+    cx.strokeStyle='rgba(255,255,255,.55)';
+    cx.beginPath(); cx.ellipse(sx(0), sz(0), (p.R/(p.S/2))*(W-56)/2, (p.R/(p.S/2))*(H-56)/2, 0, 0, Math.PI*2); cx.stroke();
+    cx.fillStyle='#EFF6E0'; cx.beginPath(); cx.arc(sx(p.ax), sz(p.az), 3, 0, Math.PI*2); cx.fill();
+    cx.restore();
+  }
+
+  // contours
+  if (p.contours){
+    const levels=[]; const range=maxDbm-minDbm; const step = Math.max(2, Math.round(range/8));
+    for(let L=Math.ceil(minDbm/step)*step; L<=maxDbm; L+=step) levels.push(L);
+    const nxg = nx, nzg = nz;
+    function sxWrap(ix){ const X = -p.S/2 + ix*(p.S/(nxg-1)); return sx(X); }
+    function szWrap(jz){ const Z = -p.S/2 + jz*(p.S/(nzg-1)); return sz(Z); }
+    (function drawContours(){
+      const cx2=cv.getContext('2d');
+      cx2.save(); cx2.strokeStyle='rgba(255,255,255,.75)'; cx2.setLineDash([8,4]); cx2.lineWidth=1;
+      for(const L of levels){
+        for(let i=0;i<nxg-1;i++){
+          for(let j=0;j<nzg-1;j++){
+            const v00=grid[i][j], v10=grid[i+1][j], v01=grid[i][j+1], v11=grid[i+1][j+1];
+            const c = (v00>=L?1:0) | (v10>=L?2:0) | (v11>=L?4:0) | (v01>=L?8:0);
+            if(c===0||c===15) continue;
+            function interp(a,b,va,vb){ const t=(L-va)/(vb-va+1e-9); return a+(b-a)*t; }
+            const e=[
+              {x:i,   z:interp(j,j+1,v00,v01)},
+              {x:i+1, z:interp(j,j+1,v10,v11)},
+              {x:interp(i,i+1,v00,v10), z:j},
+              {x:interp(i,i+1,v01,v11), z:j+1}
+            ];
+            const map={1:[0,2],2:[2,1],3:[0,1],4:[1,3],5:[0,3,2,1],6:[2,3],7:[0,3],8:[0,3],9:[2,3],10:[0,2,1,3],11:[1,3],12:[0,1],13:[2,1],14:[0,2]};
+            const arr=map[c]||[];
+            for(let k=0;k<arr.length;k+=2){
+              const a=e[arr[k]], b=e[arr[k+1]];
+              cx2.beginPath(); cx2.moveTo(sxWrap(a.x), szWrap(a.z)); cx2.lineTo(sxWrap(b.x), szWrap(b.z)); cx2.stroke();
+            }
+          }
+        }
+      }
+      cx2.restore();
+      cx2.fillStyle='rgba(255,255,255,.9)'; cx2.font='12px ui-monospace,monospace';
+      levels.forEach((L,i)=> cx2.fillText(L.toFixed(0)+' dBm', 32, 28+14*(i+1)));
+    })();
+  }
+
+  // stats & colorbar
+  el('stats').innerHTML = `
+    <div>EIRP</div><div>${(toDbm(p.Pt)+p.Gt).toFixed(1)} dBm</div>
+    <div>Grid</div><div>${p.n} × ${Math.round(p.n/2)} (smoothing=${p.smooth?'on':'off'})</div>
+    <div>Pr aralığı</div><div>${minDbm}…${maxDbm} dBm</div>
+  `;
+  colorbar(minDbm,maxDbm);
+
+  // cursor readout
+  cv.onmousemove = (e)=>{
+    const rect = cv.getBoundingClientRect();
+    const X = (e.clientX - rect.left) * (cv.width/rect.width);
+    const Y = (e.clientY - rect.top)  * (cv.height/rect.height);
+    const x = ix(X), z = iz(Y);
+    const d = Math.max(1, Math.hypot(p.ax-x, p.az-z));
+    let L = fspl_dB(d, p.f, p.mode);
+    let atten=0;
+    if (crossesFuselage(p.ax,p.az,x,z,p.L/2,p.W/2)) atten += p.FdB;
+    if (crossesRotor(p.ax,p.az,x,z,p.R))           atten += rotorAvgAtten_dB(p.N,p.chord,p.R,p.RdB);
+    const Pr = (toDbm(p.Pt)+p.Gt) - L - atten + p.Gr;
+    el('cursor').textContent = `x=${x.toFixed(1)} m, z=${z.toFixed(1)} m → FSPL=${L.toFixed(1)} dB, Atten≈${atten.toFixed(1)} dB, Pr=${Pr.toFixed(1)} dBm`;
+  };
+  el('log').textContent='OK: render';
+}
+
+// PNG Export 4K
+el('exportPng').addEventListener('click', ()=>{
+  const src=el('cv');
+  const scale=2;
+  const W=src.width*scale, H=src.height*scale;
+  const tmp=document.createElement('canvas'); tmp.width=W; tmp.height=H;
+  const cx=tmp.getContext('2d'); cx.imageSmoothingEnabled=true; cx.imageSmoothingQuality='high';
+  cx.drawImage(src,0,0,W,H);
+  const a=document.createElement('a'); a.href=tmp.toDataURL('image/png'); a.download='maxwellsim_coverage_4k.png'; a.click();
+});
+
+// Presets
+function fireDraw(){ upd(); draw(); }
+el('preset-uhf').addEventListener('click',()=>{ el('freq').value=430; el('ptw').value=8; el('gt').value=3; el('gr').value=3; el('thresh').value=-95; el('scale').value=200; el('res').value=360; fireDraw(); });
+el('preset-sband').addEventListener('click',()=>{ el('freq').value=2400; el('ptw').value=15; el('gt').value=7; el('gr').value=7; el('thresh').value=-85; el('scale').value=160; el('res').value=400; fireDraw(); });
+
+// Simulate
+el('simulate').addEventListener('click', draw);
+
+// Init
+window.addEventListener('load', ()=>{ ids.forEach(id=>{ const e=el(id); if(e){} }); upd(); draw(); });
+</script>
+</body>
+</html>
