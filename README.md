@@ -175,18 +175,7 @@ gantt
 
 ---
 
-## 7) Release Timeline
-```mermaid
-timeline
-  title Releases
-  2025-09-10 : M0 — First prototype (FDTD)
-  2025-09-25 : M1 — Stable UI + FFT
-  2025-10-10 : M2 — Add FEM + Export VTK
-```
-
----
-
-## 8) User Journey — Journey Diagram
+## 7) User Journey — Journey Diagram
 ```mermaid
 journey
   title User Journey
@@ -202,7 +191,7 @@ journey
 
 ---
 
-## 9) Git Workflow — GitGraph (Optional)
+## 8) Git Workflow — GitGraph (Optional)
 ```mermaid
 gitGraph
   commit id: "init"
